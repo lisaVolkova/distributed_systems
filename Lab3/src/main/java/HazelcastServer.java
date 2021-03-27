@@ -38,7 +38,7 @@ public class HazelcastServer {
         for (HazelcastInstance client : clients) {
             new Thread(() -> {
                 Map<String, Integer> map = client.getMap(MAP_SECOND_NO_LOCK);
-                map.put(MAP_KEY, 0);
+                map.putIfAbsent(MAP_KEY, 0);
                 for (int i = 0; i < 1000; i++) {
                     int k = map.get(MAP_KEY);
                     map.put(MAP_KEY, ++k);
@@ -47,11 +47,11 @@ public class HazelcastServer {
             }).start();
             new Thread(() -> {
                 IMap<String, Integer> map = client.getMap(MAP_SECOND_PES_LOCK);
-                map.put(MAP_KEY, 0);
+                map.putIfAbsent(MAP_KEY, 0);
                 for (int i = 0; i < 1000; i++) {
-                    int k = map.get(MAP_KEY);
                     map.lock(MAP_KEY);
                     try {
+                        int k = map.get(MAP_KEY);
                         Thread.sleep( 10 );
                         map.put(MAP_KEY, ++k);
                     } catch (InterruptedException ignored) {
@@ -63,15 +63,15 @@ public class HazelcastServer {
             }).start();
             new Thread(() -> {
                 IMap<String, Value> map = client.getMap(MAP_SECOND_OPT_LOCK);
-                map.put(MAP_KEY, new Value());
+                map.putIfAbsent(MAP_KEY, new Value());
                 for (int i = 0; i < 1000; i++) {
                     try {
-                        Value old = map.get(MAP_KEY);
-                        Value neww = new Value(old);
-                        neww.amount++;
-                        Thread.sleep( 10 );
                         for (;;) {
-                            if (map.replace(MAP_KEY, old, neww))
+                            Value oldValue = map.get(MAP_KEY);
+                            Value newValue = new Value(oldValue);
+                            Thread.sleep( 10 );
+                            newValue.amount++;
+                            if (map.replace(MAP_KEY, oldValue, newValue))
                                 break;
                         }
                     } catch (InterruptedException ignored) {
